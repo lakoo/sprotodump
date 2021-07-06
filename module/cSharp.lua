@@ -368,10 +368,8 @@ local function dump_class(class_info, stream, deep)
           stream:write("return;", deep + 2)
         for i = 1, #sproto_type do
           local field = sproto_type[i]
-          local type = _2class_type(field)
           local name = field.name
           local is_array = field.array
-          local tag = field.tag   
           local func_name= nil
           local typename = field.typename
           local decimal = field.decimal
@@ -402,7 +400,7 @@ local function dump_class(class_info, stream, deep)
                   stream:write(sformat("tTable.RawSet(\"%s\", (double)_%s);", name, name), deep + 2)  
                 else
                   stream:write(sformat("tTable.RawSet(\"%s\", _%s);", name, name), deep + 2)     
-                end     
+                end
             end
           else
             if is_array then
@@ -423,13 +421,12 @@ local function dump_class(class_info, stream, deep)
                 stream:write(sformat("var tTT = (LuaInterface.LuaTable)tTable[\"%s\"];", name), deep + 2)
                 stream:write(sformat("_%s.ToLuaTable(tTT);", name), deep + 2)
               stream:write("}", deep + 1)
-            end  
+            end
           end
-
         end
       stream:write("}\n", deep)
     end
-    
+
     deep = deep - 1;
     stream:write("}\n\n", deep)
 

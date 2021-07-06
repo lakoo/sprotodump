@@ -14,6 +14,7 @@ usage: lua sprotodump.lua <option> <sproto_file1 sproto_file2 ...> [[<out_option
         -go              dump to go code file
         -md              dump to markdown file
         -lua             dump to lua table
+        -tag             dump tags to lua file
         
     out_option:
         -d <dircetory>               dump to speciffic dircetory
@@ -39,6 +40,7 @@ local module = {
   ["-go"] = load_module "module.go",
   ["-md"] = load_module "module.md",
   ["-lua"] = load_module "module.table",
+  ["-tag"] = load_module "module.tag",
 }
 
 
