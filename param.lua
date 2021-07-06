@@ -117,6 +117,7 @@ local function parse_param(...)
     ["-split"] = { "split", 1},
     ["-crypt"] = { "crypt", 0},
     ["-namespace"] = { "namespace", 0},
+    ["-toLuaTable"] = { "toLuaTable", 0},
   }
   while not stream:is_end() do
     local k = stream:current()

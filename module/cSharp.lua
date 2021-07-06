@@ -286,7 +286,7 @@ end
 
 
 
-local function dump_class(class_info, stream, deep)
+local function dump_class(class_info, stream, deep, toLuaTable)
   local class_name = class_info.class_name
   local sproto_type = class_info.sproto_type
   local internal_class = class_info.internal_class
@@ -302,7 +302,7 @@ local function dump_class(class_info, stream, deep)
     -- internal class
     stream:write("", deep)
     for i=1,#internal_class do
-      dump_class(internal_class[i], stream, deep)
+      dump_class(internal_class[i], stream, deep, toLuaTable)
     end
 
     -- property
@@ -359,9 +359,77 @@ local function dump_class(class_info, stream, deep)
         _write_encode_field(field, i-1, stream, deep+1)
       end
       stream:write("return base.serialize.close ();", deep+1);
-    stream:write("}", deep)
+    stream:write("}\n", deep)
 
+    -- to lua table
+    if toLuaTable then
+      stream:write("public override void ToLuaTable(LuaInterface.LuaTable tTable) {", deep)
+        stream:write("if(max_field_count <= 0)", deep + 1)
+          stream:write("return;", deep + 2)
+        -- stream:write("var tIndex = 0;", deep + 1)
+        local contain_tt = false
+        for i = 1, #sproto_type do
+          local field = sproto_type[i]
+          local type = _2class_type(field)
+          local name = field.name
+          local is_array = field.array
+          local tag = field.tag   
+          local func_name= nil
+          local typename = field.typename
+          local decimal = field.decimal
+          if typename == "integer" and decimal then
+            decimal = 10^decimal
+            func_name ="read_decimal"
+          else
+            func_name = _read_func[typename]
+          end
 
+          if func_name then
+            if field.array then
+              stream:write(sformat("if(_%s != null){", name), deep + 1)
+                stream:write(sformat("tTable.AddTable(\"%s\");" , name), deep + 2)
+                stream:write(sformat("var tT = (LuaInterface.LuaTable)tTable[\"%s\"];", name), deep + 2)
+                stream:write(sformat("for(int i = 0; i < _%s.Count; i++)", name), deep + 2)
+                  if string.match(func_name, "read_integer") then
+                    stream:write(sformat("tT.RawSetIndex(i, (double)_%s[i]);", name), deep + 3)
+                  else
+                    stream:write(sformat("tT.RawSetIndex(i, _%s[i]);", name), deep + 3)
+                  end
+              stream:write("}")
+            else
+              stream:write(sformat("if(base.has_field.has_field(%s))", i - 1), deep + 1)
+                if string.match(func_name, "read_integer") then
+                  stream:write(sformat("tTable.RawSet(\"%s\", (double)_%s);", name, name), deep + 2)  
+                else
+                  stream:write(sformat("tTable.RawSet(\"%s\", _%s);", name, name), deep + 2)     
+                end     
+            end
+          else
+            if field.array then
+              stream:write(sformat("if(_%s != null){", name), deep + 1)
+                stream:write(sformat("tTable.AddTable(\"%s\");" , name), deep + 2)
+                stream:write(sformat("var tT = (LuaInterface.LuaTable)tTable[\"%s\"];", name), deep + 2)
+                stream:write(sformat("for(int i = 0; i < _%s.Count; i++){", name), deep + 2)
+                  stream:write(sformat("var tI = _%s[i];", name), deep + 3)
+                  stream:write("var tIndex = i;", deep + 3)
+                  stream:write("tT.AddTable(tIndex);", deep + 3)
+                  stream:write("var tTT = (LuaInterface.LuaTable)tT[tIndex];", deep + 3)
+                  stream:write("tI.ToLuaTable(tTT);", deep + 3)
+                stream:write("}", deep + 2)
+              stream:write("}", deep + 1)
+            else
+              stream:write(sformat("if(_%s != null){", name), deep + 1)
+                stream:write(sformat("tTable.AddTable(\"%s\");", name), deep + 2)
+                stream:write(sformat("var tTT = (LuaInterface.LuaTable)tTable[\"%s\"];", name), deep + 2)
+                stream:write(sformat("_%s.ToLuaTable(tTT);", name), deep + 2)
+              stream:write("}", deep + 1)
+            end  
+          end
+
+        end
+      stream:write("}\n", deep)
+    end
+    
     deep = deep - 1;
     stream:write("}\n\n", deep)
 
@@ -371,7 +439,7 @@ local function dump_class(class_info, stream, deep)
     -- internal class
     stream:write("", deep)
     for i=1,#internal_class do
-      dump_class(internal_class[i], stream, deep+1)
+      dump_class(internal_class[i], stream, deep+1, toLuaTable)
     end
     stream:write("}\n\n", deep)
   end
@@ -451,7 +519,7 @@ local function parse_protocol(class, stream, package)
 end
 
 
-local function parse_type(class, stream, package)
+local function parse_type(class, stream, package, toLuaTable)
   if not class or #class == 0 then return end
 
   local namespace = _gen_sprototype_namespace(package)
@@ -459,7 +527,7 @@ local function parse_type(class, stream, package)
 
   for i=1,#class do
     local class_info = class[i]
-    dump_class(class_info, stream, 1)
+    dump_class(class_info, stream, 1, toLuaTable)
   end
 
   stream:write("}\n\n")
@@ -473,7 +541,7 @@ using System.Collections.Generic;
 ]]
 
 
-local function parse_ast2type(ast, package, name)
+local function parse_ast2type(ast, package, name, toLuaTable)
   package = package or ""
   local type_class = gen_type_class(ast)
   local stream = create_stream()
@@ -483,7 +551,7 @@ local function parse_ast2type(ast, package, name)
   stream:write(using)
 
   -- parse type
-  parse_type(type_class, stream, package)
+  parse_type(type_class, stream, package, toLuaTable)
 
   return stream:dump()
 end
@@ -504,7 +572,7 @@ local function parse_ast2protocol(ast, package)
 end
 
 
-local function parse_ast2all(ast, package, name)
+local function parse_ast2all(ast, package, name, toLuaTable)
   package = package or ""
   local type_class = gen_type_class(ast.type)
   local protocol_class = gen_protocol_class(ast.protocol)
@@ -514,10 +582,10 @@ local function parse_ast2all(ast, package, name)
   stream:write([[// source: ]]..(name or "input").."\n")
   stream:write(using)
 
-  parse_type(type_class, stream, package)
+  parse_type(type_class, stream, package, toLuaTable)
   parse_protocol(protocol_class, stream, package)
 
-  return stream:dump()  
+  return stream:dump()
 end
 
 
@@ -531,7 +599,7 @@ local function main(trunk, build, param)
   local dir = param.dircetory or ""
 
   if outfile then
-    local data = parse_ast2all(build, package, table.concat(param.sproto_file, " "))
+    local data = parse_ast2all(build, package, table.concat(param.sproto_file, " "), param.toLuaTable)
     util.write_file(dir..outfile, data, "w")
   else
     -- dump sprototype
