@@ -19,6 +19,7 @@ usage: lua sprotodump.lua <option> <sproto_file1 sproto_file2 ...> [[<out_option
         -d <dircetory>               dump to speciffic dircetory
         -o <file>                    dump to speciffic file
         -p <package name>            set package name(only cSharp code use)
+        -toluatable                  add method ToLuaTable for all classes(only cSharp)
 
     namespace_option:
         -namespace       add namespace to type and protocol
@@ -47,6 +48,7 @@ if not param or not module[param.dump_type] then
   print(README)
   return
 end
+_G["PARAM"] = param
 
 ------------------------------- parser -------------------------------------
 local function _gen_trunk_list(sproto_file, namespace)
