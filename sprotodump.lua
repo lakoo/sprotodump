@@ -14,11 +14,13 @@ usage: lua sprotodump.lua <option> <sproto_file1 sproto_file2 ...> [[<out_option
         -go              dump to go code file
         -md              dump to markdown file
         -lua             dump to lua table
+        -tag             dump tags to lua file
         
     out_option:
         -d <dircetory>               dump to speciffic dircetory
         -o <file>                    dump to speciffic file
         -p <package name>            set package name(only cSharp code use)
+        -toluatable                  add method ToLuaTable for all classes(only cSharp)
 
     namespace_option:
         -namespace       add namespace to type and protocol
@@ -38,6 +40,7 @@ local module = {
   ["-go"] = load_module "module.go",
   ["-md"] = load_module "module.md",
   ["-lua"] = load_module "module.table",
+  ["-tag"] = load_module "module.tag",
 }
 
 
@@ -47,6 +50,7 @@ if not param or not module[param.dump_type] then
   print(README)
   return
 end
+_G["PARAM"] = param
 
 ------------------------------- parser -------------------------------------
 local function _gen_trunk_list(sproto_file, namespace)

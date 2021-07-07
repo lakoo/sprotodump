@@ -359,8 +359,73 @@ local function dump_class(class_info, stream, deep)
         _write_encode_field(field, i-1, stream, deep+1)
       end
       stream:write("return base.serialize.close ();", deep+1);
-    stream:write("}", deep)
+    stream:write("}\n", deep)
 
+    -- to lua table
+    if PARAM.toLuaTable then
+      stream:write("public override void ToLuaTable(LuaInterface.LuaTable tTable) {", deep)
+        stream:write("if(max_field_count <= 0)", deep + 1)
+          stream:write("return;", deep + 2)
+        for i = 1, #sproto_type do
+          local field = sproto_type[i]
+          local name = field.name
+          local is_array = field.array
+          local func_name= nil
+          local typename = field.typename
+          local decimal = field.decimal
+          local cast_double = false
+          if typename == "integer" and decimal then
+            decimal = 10^decimal
+            func_name ="read_decimal"
+          else
+            func_name = _read_func[typename]
+            cast_double = typename == "integer"
+          end
+
+          if func_name then
+            if is_array then
+              stream:write(sformat("if(_%s != null){", name), deep + 1)
+                stream:write(sformat("tTable.AddTable(\"%s\");" , name), deep + 2)
+                stream:write(sformat("var tT = (LuaInterface.LuaTable)tTable[\"%s\"];", name), deep + 2)
+                stream:write(sformat("for(int i = 0; i < _%s.Count; i++)", name), deep + 2)
+                  if cast_double then
+                    stream:write(sformat("tT.RawSetIndex(i, (double)_%s[i]);", name), deep + 3)
+                  else
+                    stream:write(sformat("tT.RawSetIndex(i, _%s[i]);", name), deep + 3)
+                  end
+              stream:write("}")
+            else
+              stream:write(sformat("if(base.has_field.has_field(%s))", i - 1), deep + 1)
+                if cast_double then
+                  stream:write(sformat("tTable.RawSet(\"%s\", (double)_%s);", name, name), deep + 2)  
+                else
+                  stream:write(sformat("tTable.RawSet(\"%s\", _%s);", name, name), deep + 2)     
+                end
+            end
+          else
+            if is_array then
+              stream:write(sformat("if(_%s != null){", name), deep + 1)
+                stream:write(sformat("tTable.AddTable(\"%s\");" , name), deep + 2)
+                stream:write(sformat("var tT = (LuaInterface.LuaTable)tTable[\"%s\"];", name), deep + 2)
+                stream:write(sformat("for(int i = 0; i < _%s.Count; i++){", name), deep + 2)
+                  stream:write(sformat("var tI = _%s[i];", name), deep + 3)
+                  stream:write("var tIndex = i;", deep + 3)
+                  stream:write("tT.AddTable(tIndex);", deep + 3)
+                  stream:write("var tTT = (LuaInterface.LuaTable)tT[tIndex];", deep + 3)
+                  stream:write("tI.ToLuaTable(tTT);", deep + 3)
+                stream:write("}", deep + 2)
+              stream:write("}", deep + 1)
+            else
+              stream:write(sformat("if(_%s != null){", name), deep + 1)
+                stream:write(sformat("tTable.AddTable(\"%s\");", name), deep + 2)
+                stream:write(sformat("var tTT = (LuaInterface.LuaTable)tTable[\"%s\"];", name), deep + 2)
+                stream:write(sformat("_%s.ToLuaTable(tTT);", name), deep + 2)
+              stream:write("}", deep + 1)
+            end
+          end
+        end
+      stream:write("}\n", deep)
+    end
 
     deep = deep - 1;
     stream:write("}\n\n", deep)
@@ -371,7 +436,7 @@ local function dump_class(class_info, stream, deep)
     -- internal class
     stream:write("", deep)
     for i=1,#internal_class do
-      dump_class(internal_class[i], stream, deep+1)
+      dump_class(internal_class[i], stream, deep + 1)
     end
     stream:write("}\n\n", deep)
   end
@@ -517,7 +582,7 @@ local function parse_ast2all(ast, package, name)
   parse_type(type_class, stream, package)
   parse_protocol(protocol_class, stream, package)
 
-  return stream:dump()  
+  return stream:dump()
 end
 
 
